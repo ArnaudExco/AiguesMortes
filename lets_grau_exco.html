@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aigues-Mortes EXCO</title>
+<style>
+  :root {
+    --navy:#003366; --green:#00A850; --light:#E8F5EE; --sand:#F7F4EE;
+    --gold:#C4932A; --text:#1A1A2E; --muted:#6B7280; --border:rgba(0,0,0,0.10);
+    --r:12px; --rs:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;background:var(--sand);color:var(--text);}
+  .screen{display:none;min-height:100vh;flex-direction:column;}
+  .screen.active{display:flex;}
+  .app-header{background:var(--navy);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+  .app-title{color:white;font-size:15px;font-weight:600;}
+  .btn-map{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:white;border-radius:var(--rs);padding:6px 12px;font-size:12px;cursor:pointer;}
+  .btn-map:hover{background:rgba(255,255,255,0.2);}
+
+  /* MAP OVERLAY */
+  .map-overlay{position:fixed;inset:0;background:rgba(0,0,30,0.6);z-index:200;display:none;align-items:flex-end;}
+  .map-overlay.open{display:flex;}
+  .map-panel{background:white;border-radius:20px 20px 0 0;padding:20px 16px 32px;width:100%;max-height:82vh;overflow-y:auto;animation:slideUp 0.25s ease;}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .drag-bar{width:36px;height:4px;background:#DDD;border-radius:2px;margin:0 auto 14px;}
+  .map-title{font-size:16px;font-weight:600;color:var(--navy);text-align:center;margin-bottom:14px;}
+  .stop-list{display:flex;flex-direction:column;gap:8px;}
+  .stop-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--rs);border:1px solid var(--border);background:white;transition:opacity 0.3s;}
+  .stop-item.done{opacity:0.38;background:#f5f5f5;}
+  .stop-num{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--green);color:white;}
+  .stop-item.done .stop-num{background:#B0B0B0;}
+  .stop-text{flex:1;}
+  .stop-name{font-size:13px;font-weight:600;color:var(--text);}
+  .stop-desc{font-size:11px;color:var(--muted);margin-top:1px;}
+  .stop-dist{font-size:11px;color:var(--green);font-weight:600;white-space:nowrap;}
+  .stop-item.done .stop-dist{color:#B0B0B0;}
+
+  /* MAP: lien Google Maps */
+  .gmaps-btn{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--navy);color:white;font-size:13px;font-weight:500;padding:10px 16px;border-radius:var(--rs);text-decoration:none;margin-bottom:14px;}
+
+  /* WELCOME */
+  #screen-welcome{background:linear-gradient(160deg,var(--navy) 0%,#00592C 100%);justify-content:space-between;}
+  .welcome-hero{padding:36px 24px 16px;text-align:center;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .exco-logo{margin-bottom:20px;}
+  .welcome-title{font-size:30px;font-weight:800;color:white;letter-spacing:-0.02em;line-height:1.15;margin-bottom:8px;}
+  .welcome-title span{color:#6EE6A2;}
+  .welcome-sub{font-size:13px;color:rgba(255,255,255,0.7);margin-bottom:24px;line-height:1.6;}
+  .badges{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:24px;}
+  .badge{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.9);font-size:11px;padding:4px 10px;border-radius:20px;}
+  .qr-btn{background:transparent;border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.7);font-size:11px;padding:5px 12px;border-radius:20px;cursor:pointer;margin-bottom:12px;}
+  .welcome-bottom{padding:20px 24px 36px;}
+  .team-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+  .team-btn{background:rgba(255,255,255,0.1);border:2px solid rgba(255,255,255,0.2);border-radius:var(--r);padding:10px 14px;cursor:pointer;text-align:left;color:white;transition:all 0.15s;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .team-btn.selected{background:rgba(110,230,162,0.25);border-color:#6EE6A2;}
+  .team-icon{font-size:18px;flex-shrink:0;}
+  .team-name{font-size:13px;font-weight:600;flex-shrink:0;min-width:80px;}
+  .team-members-list{flex:1;display:flex;flex-wrap:wrap;gap:4px;}
+  .member-chip{font-size:10px;background:rgba(255,255,255,0.12);border-radius:4px;padding:2px 6px;color:rgba(255,255,255,0.85);}
+  .team-start{font-size:10px;color:rgba(255,255,255,0.45);width:100%;padding-left:28px;margin-top:1px;}
+  .btn-start{width:100%;padding:15px;background:var(--green);color:white;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer;}
+  .btn-start:disabled{opacity:0.4;cursor:not-allowed;}
+
+  /* ROUTE INTRO */
+  #screen-route{background:var(--sand);}
+  .route-content{flex:1;padding:20px 16px;overflow-y:auto;}
+  .route-h{font-size:18px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+  .route-sub{font-size:13px;color:var(--muted);margin-bottom:18px;}
+  .route-step{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--border);}
+  .route-step:last-child{border:none;}
+  .rdot{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;}
+  .rdot.s{background:var(--gold);color:white;}
+  .rdot.r{background:var(--green);color:white;}
+  .rstep-label{font-size:10px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:0.06em;}
+  .rstep-loc{font-size:14px;font-weight:600;color:var(--text);margin-top:1px;}
+  .rstep-hint{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4;}
+  .btn-go{margin:16px 16px 28px;padding:15px;background:var(--navy);color:white;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;width:calc(100% - 32px);}
+
+  /* WAYPOINT */
+  #screen-waypoint{background:var(--navy);}
+  .wp-content{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 24px;text-align:center;}
+  .wp-icon{font-size:48px;margin-bottom:12px;}
+  .wp-num{font-size:11px;font-weight:600;color:var(--green);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:5px;}
+  .wp-place{font-size:22px;font-weight:700;color:white;margin-bottom:8px;}
+  .wp-desc{font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:16px;line-height:1.6;}
+  .wp-nav-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);border-radius:var(--r);padding:10px 18px;color:white;font-size:13px;text-decoration:none;margin-bottom:20px;}
+  .wp-pts{background:rgba(0,168,80,0.2);border:1px solid var(--green);border-radius:var(--r);padding:8px 18px;color:#6EE6A2;font-size:13px;font-weight:600;margin-bottom:24px;}
+  .btn-ready{width:100%;padding:15px;background:var(--green);color:white;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;}
+
+  /* QUESTION */
+  #screen-question{background:var(--sand);}
+  .q-main{flex:1;padding:14px;overflow-y:auto;padding-bottom:90px;}
+  .q-topbar{display:flex;align-items:center;gap:8px;margin-bottom:12px;}
+  .q-prog{flex:1;display:flex;gap:4px;}
+  .q-dot{flex:1;height:4px;border-radius:2px;background:#DDD;transition:background 0.3s;}
+  .q-dot.done{background:var(--green);}
+  .q-dot.cur{background:var(--gold);}
+  .q-pill{font-size:11px;color:white;background:var(--navy);border-radius:20px;padding:4px 10px;white-space:nowrap;}
+  .timer-wrap{display:flex;justify-content:center;margin-bottom:14px;}
+  .timer-svg{transform:rotate(-90deg);}
+  .t-track{fill:none;stroke:#E5E7EB;stroke-width:6;}
+  .t-arc{fill:none;stroke:var(--green);stroke-width:6;stroke-linecap:round;transition:stroke-dashoffset 1s linear,stroke 0.3s;}
+  .t-num{font-size:20px;font-weight:700;fill:var(--text);text-anchor:middle;dominant-baseline:central;transform:rotate(90deg);transform-origin:40px 40px;}
+  .loc-pill{display:inline-flex;align-items:center;gap:4px;background:var(--light);color:var(--green);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;}
+  .q-card{background:white;border-radius:var(--r);padding:16px;border:1px solid var(--border);margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.04);}
+  .q-text{font-size:16px;font-weight:600;color:var(--text);line-height:1.5;margin-bottom:8px;}
+  .q-hint{font-size:12px;color:var(--muted);font-style:italic;}
+  .answers{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+  .ans-btn{width:100%;text-align:left;padding:13px 14px;border-radius:var(--rs);border:1.5px solid var(--border);background:white;font-size:14px;color:var(--text);cursor:pointer;line-height:1.4;transition:all 0.15s;display:flex;align-items:center;gap:10px;}
+  .ans-btn:hover:not(:disabled){border-color:var(--green);background:var(--light);}
+  .ans-btn.correct{background:#E8F5EE;border-color:var(--green);color:#065F35;}
+  .ans-btn.wrong{background:#FEF2F2;border-color:#EF4444;color:#7F1D1D;}
+  .ans-btn.reveal{background:#E8F5EE;border-color:var(--green);color:#065F35;}
+  .ans-btn:disabled{cursor:default;}
+  .ans-ltr{width:24px;height:24px;border-radius:6px;background:#F3F4F6;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--muted);}
+  .ans-btn.correct .ans-ltr{background:var(--green);color:white;}
+  .ans-btn.wrong .ans-ltr{background:#EF4444;color:white;}
+  .ans-btn.reveal .ans-ltr{background:var(--green);color:white;}
+  .expl{background:#FFFBEB;border:1px solid #FCD34D;border-radius:var(--rs);padding:11px 13px;font-size:12px;color:#78350F;line-height:1.6;display:none;margin-bottom:10px;}
+  .q-footer{position:fixed;bottom:0;left:0;right:0;background:white;border-top:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:8px;}
+  .score-tag{background:var(--light);color:var(--green);font-size:13px;font-weight:600;padding:8px 12px;border-radius:var(--rs);white-space:nowrap;}
+  .btn-next{flex:1;padding:11px;background:var(--navy);color:white;border:none;border-radius:var(--rs);font-size:13px;font-weight:600;cursor:pointer;display:none;}
+
+  /* FINAL */
+  #screen-final{background:var(--navy);}
+  .final-c{flex:1;overflow-y:auto;padding:20px 16px 28px;}
+  .final-hero{text-align:center;margin-bottom:20px;}
+  .final-trophy{font-size:52px;margin-bottom:6px;}
+  .final-title{font-size:22px;font-weight:800;color:white;}
+  .final-team{font-size:14px;color:rgba(255,255,255,0.6);margin-top:3px;}
+  .score-card{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:var(--r);padding:18px;margin-bottom:18px;text-align:center;}
+  .score-big{font-size:48px;font-weight:800;color:#6EE6A2;}
+  .score-lbl{font-size:12px;color:rgba(255,255,255,0.5);}
+  .score-msg{font-size:13px;color:rgba(255,255,255,0.75);line-height:1.5;margin-top:8px;}
+  .rank-card{background:white;border-radius:var(--r);overflow:hidden;margin-bottom:18px;}
+  .rank-hd{background:var(--navy);padding:11px 14px;}
+  .rank-hd h3{font-size:13px;font-weight:600;color:white;}
+  .rank-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid #F3F4F6;}
+  .rank-row:last-child{border:none;}
+  .rank-n{font-size:18px;width:26px;text-align:center;flex-shrink:0;}
+  .rank-t{flex:1;}
+  .rank-name{font-size:13px;font-weight:600;color:var(--text);}
+  .rank-bar-w{height:3px;background:#F3F4F6;border-radius:2px;margin-top:3px;}
+  .rank-bar{height:3px;background:var(--green);border-radius:2px;}
+  .rank-pts{font-size:14px;font-weight:700;color:var(--navy);}
+  .rank-row.pending .rank-name{color:var(--muted);}
+  .rank-row.pending .rank-pts{color:var(--muted);font-size:11px;}
+  .btn-replay{width:100%;padding:14px;background:var(--green);color:white;border:none;border-radius:var(--r);font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;}
+  .powered{text-align:center;font-size:11px;color:rgba(255,255,255,0.25);margin-top:6px;}
+
+  /* QR MODAL */
+  .qr-modal{position:fixed;inset:0;background:rgba(0,0,30,0.8);z-index:500;display:none;align-items:center;justify-content:center;}
+  .qr-modal.open{display:flex;}
+  .qr-box{background:white;border-radius:20px;padding:26px;text-align:center;max-width:280px;margin:0 16px;}
+</style>
+</head>
+<body>
+
+<!-- QR MODAL -->
+<div class="qr-modal" id="qr-modal">
+  <div class="qr-box">
+    <div style="font-size:22px;font-weight:800;color:var(--navy);letter-spacing:3px;">EXCO</div>
+    <div style="width:44px;height:3px;background:var(--green);border-radius:2px;margin:4px auto 12px;"></div>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px;">Aigues-Mortes EXCO</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Scannez pour jouer !</div>
+    <div id="qr-img-wrap" style="margin-bottom:12px;"></div>
+    <div style="font-size:11px;color:var(--navy);font-weight:600;background:var(--light);padding:6px 12px;border-radius:8px;margin-bottom:14px;" id="qr-url-display">letsgrau.exco.fr</div>
+    <button onclick="document.getElementById('qr-modal').classList.remove('open')" style="width:100%;padding:10px;background:var(--navy);color:white;border:none;border-radius:8px;font-size:13px;cursor:pointer;">Fermer</button>
+  </div>
+</div>
+
+<!-- MAP OVERLAY -->
+<div class="map-overlay" id="map-overlay" onclick="if(event.target===this)closeMap()">
+  <div class="map-panel">
+    <div class="drag-bar"></div>
+    <div class="map-title">🗺️ Parcours — Cité médiévale d'Aigues-Mortes</div>
+    <a id="gmaps-all" href="#" target="_blank" rel="noopener" class="gmaps-btn">
+      📍 Ouvrir dans Google Maps
+    </a>
+    <div class="stop-list" id="map-stop-list"></div>
+  </div>
+</div>
+
+<!-- WELCOME -->
+<div class="screen active" id="screen-welcome">
+  <div class="welcome-hero">
+    <div class="exco-logo">
+      <svg width="110" height="40" viewBox="0 0 110 40" fill="none">
+        <rect width="110" height="40" rx="6" fill="white" fill-opacity="0.12"/>
+        <text x="55" y="27" text-anchor="middle" font-family="'Segoe UI',Arial,sans-serif" font-size="20" font-weight="800" letter-spacing="3" fill="white">EXCO</text>
+        <rect x="10" y="33" width="90" height="2" rx="1" fill="#6EE6A2"/>
+      </svg>
+    </div>
+    <div class="welcome-title">Aigues-Mortes<br><span>EXCO</span></div>
+    <div class="welcome-sub">Quiz historique · Cité médiévale<br>d'Aigues-Mortes</div>
+    <div class="badges">
+      <span class="badge">🏰 8 arrêts</span>
+      <span class="badge">⏱ 60s / question</span>
+      <span class="badge">👥 5 équipes</span>
+      <span class="badge">🏆 Classement live</span>
+    </div>
+    <button class="qr-btn" onclick="openQR()">📱 QR Code équipes</button>
+  </div>
+  <div class="welcome-bottom">
+    <p style="font-size:13px;color:rgba(255,255,255,0.7);text-align:center;margin-bottom:10px;font-weight:500;">Choisissez votre équipe</p>
+    <div class="team-grid" id="team-grid"></div>
+    <button class="btn-start" id="btn-start" disabled onclick="startGame()">🚀 Partir à l'aventure</button>
+  </div>
+</div>
+
+<!-- ROUTE INTRO -->
+<div class="screen" id="screen-route">
+  <div class="app-header">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <svg width="46" height="16" viewBox="0 0 46 16"><text x="23" y="13" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="12" font-weight="800" letter-spacing="2" fill="white">EXCO</text></svg>
+      <span class="app-title">Aigues-Mortes EXCO</span>
+    </div>
+    <button class="btn-map" onclick="openMap()">🗺️ Carte</button>
+  </div>
+  <div class="route-content">
+    <div class="route-h" id="route-title">Votre parcours</div>
+    <div class="route-sub">Rejoignez d'abord votre point de départ !</div>
+    <div id="route-steps"></div>
+  </div>
+  <button class="btn-go" onclick="goWaypoint()">✅ Je suis au point de départ !</button>
+</div>
+
+<!-- WAYPOINT -->
+<div class="screen" id="screen-waypoint">
+  <div class="app-header">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <svg width="46" height="16" viewBox="0 0 46 16"><text x="23" y="13" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="12" font-weight="800" letter-spacing="2" fill="white">EXCO</text></svg>
+      <span class="app-title">Aigues-Mortes EXCO</span>
+    </div>
+    <button class="btn-map" onclick="openMap()">🗺️ Carte</button>
+  </div>
+  <div class="wp-content">
+    <div class="wp-icon" id="wp-icon">📍</div>
+    <div class="wp-num" id="wp-num">Arrêt 1 / 8</div>
+    <div class="wp-place" id="wp-place"></div>
+    <div class="wp-desc" id="wp-desc"></div>
+    <a id="wp-nav" href="#" target="_blank" rel="noopener" class="wp-nav-btn">
+      🧭 Naviguer vers ce point
+    </a>
+    <div class="wp-pts" id="wp-pts">⭐ Score actuel : 0 pts</div>
+    <button class="btn-ready" onclick="startQuestion()">📍 J'y suis, je réponds !</button>
+  </div>
+</div>
+
+<!-- QUESTION -->
+<div class="screen" id="screen-question">
+  <div class="app-header">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <svg width="46" height="16" viewBox="0 0 46 16"><text x="23" y="13" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="12" font-weight="800" letter-spacing="2" fill="white">EXCO</text></svg>
+      <span class="app-title">Aigues-Mortes EXCO</span>
+    </div>
+    <button class="btn-map" onclick="openMap()">🗺️ Carte</button>
+  </div>
+  <div class="q-main">
+    <div class="q-topbar">
+      <div class="q-prog" id="q-prog"></div>
+      <div class="q-pill" id="q-pill"></div>
+    </div>
+    <div class="timer-wrap">
+      <svg class="timer-svg" width="80" height="80" viewBox="0 0 80 80">
+        <circle class="t-track" cx="40" cy="40" r="34"/>
+        <circle class="t-arc" id="t-arc" cx="40" cy="40" r="34" stroke-dasharray="213.6" stroke-dashoffset="0"/>
+        <text class="t-num" id="t-num" x="40" y="40">60</text>
+      </svg>
+    </div>
+    <div class="loc-pill">📍 <span id="q-loc"></span></div>
+    <div class="q-card">
+      <div class="q-text" id="q-text"></div>
+      <div class="q-hint" id="q-hint"></div>
+    </div>
+    <div class="answers" id="answers"></div>
+    <div class="expl" id="expl"></div>
+  </div>
+  <div class="q-footer">
+    <div class="score-tag">⭐ <span id="score-live">0</span> pts</div>
+    <button class="btn-next" id="btn-next" onclick="nextStop()">Prochain arrêt →</button>
+  </div>
+</div>
+
+<!-- FINAL -->
+<div class="screen" id="screen-final">
+  <div class="app-header">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <svg width="46" height="16" viewBox="0 0 46 16"><text x="23" y="13" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-size="12" font-weight="800" letter-spacing="2" fill="white">EXCO</text></svg>
+      <span class="app-title">Aigues-Mortes EXCO</span>
+    </div>
+    <button class="btn-map" onclick="openMap()">🗺️ Carte</button>
+  </div>
+  <div class="final-c">
+    <div class="final-hero">
+      <div class="final-trophy" id="f-trophy">🏆</div>
+      <div class="final-title">Parcours terminé !</div>
+      <div class="final-team" id="f-team"></div>
+    </div>
+    <div class="score-card">
+      <div class="score-lbl">Votre score</div>
+      <div class="score-big" id="f-pts">0</div>
+      <div class="score-lbl">points</div>
+      <div class="score-msg" id="f-msg"></div>
+    </div>
+    <div class="rank-card">
+      <div class="rank-hd"><h3>🏅 Classement général</h3></div>
+      <div id="rank-rows"></div>
+    </div>
+    <button class="btn-replay" onclick="resetAll()">🔄 Nouvelle partie</button>
+    <div class="powered">Aigues-Mortes EXCO · EXCO Occitanie</div>
+  </div>
+</div>
+
+<script>
+// ═══ DONNÉES GPS RÉELLES — CITÉ D'AIGUES-MORTES ════════════════════
+
+const STOPS = [
+  {
+    id:0, name:"Tour de Constance", icon:"🗼",
+    desc:"Forteresse de Saint Louis (1248) — prison des huguenotes",
+    lat:43.568482, lng:4.189702,
+    gmaps:"https://maps.google.com/?cid=13720748354992034513"
+  },
+  {
+    id:1, name:"Porte de la Gardette", icon:"🚪",
+    desc:"Entrée principale de la cité médiévale — côté nord",
+    lat:43.568060, lng:4.191048,
+    gmaps:"https://maps.google.com/?cid=17084467555074556189"
+  },
+  {
+    id:2, name:"Église Notre-Dame des Sablons", icon:"⛪",
+    desc:"Église gothique XIIIe siècle — visée par les Templiers",
+    lat:43.566906, lng:4.190474,
+    gmaps:"https://maps.google.com/?cid=17940257854965428580"
+  },
+  {
+    id:3, name:"Place Saint-Louis", icon:"👑",
+    desc:"Cœur de la cité — statue équestre de Saint Louis",
+    lat:43.566881, lng:4.190199,
+    gmaps:"https://maps.google.com/?cid=6065023122723503330"
+  },
+  {
+    id:4, name:"Porte de la Marine", icon:"⚓",
+    desc:"Porte sud — ancien accès aux canaux et à la mer",
+    lat:43.564421, lng:4.191286,
+    gmaps:"https://maps.google.com/?cid=2811350555021529536"
+  },
+  {
+    id:5, name:"Porte de l'Organeau", icon:"🧱",
+    desc:"Porte ouest — vue sur les salins de Camargue",
+    lat:43.565589, lng:4.188821,
+    gmaps:"https://maps.google.com/?cid=12444191257123536710"
+  },
+  {
+    id:6, name:"Porte des Moulins", icon:"⚙️",
+    desc:"Porte sud-ouest — quartier des anciens moulins",
+    lat:43.565251, lng:4.189581,
+    gmaps:"https://maps.google.com/?cid=17307495209227131573"
+  },
+  {
+    id:7, name:"Remparts & Tours — visite", icon:"🏰",
+    desc:"Chemin de ronde — 1640m de remparts, 10 portes, 6 tours",
+    lat:43.568025, lng:4.189594,
+    gmaps:"https://maps.google.com/?cid=9703310074788919976"
+  }
+];
+
+// Point de départ différent par équipe
+const TEAM_ROUTES = {
+  1:[0,1,2,3,4,5,6,7],
+  2:[2,3,4,5,6,7,0,1],
+  3:[4,5,6,7,0,1,2,3],
+  4:[6,7,0,1,2,3,4,5],
+  5:[1,2,3,4,5,6,7,0]
+};
+
+const TEAMS = [
+  {id:1, name:"Corsaires", icon:"🏴‍☠️", members:["JOUBERT Julien","ROSINSKI Hélène","GAKALLA GAMBEMY Jérémy","NOUISSEL Mohamed","PISTAT Delphine"]},
+  {id:2, name:"Pêcheurs",  icon:"⚓",    members:["PLANTADE Stéphanie","HILAIRE Romain","CATHONNET Rémy","ASSORIN CHAMAILLARD Pascale","FOIX Maeva"]},
+  {id:3, name:"Remparts",  icon:"🏰",    members:["BOURNE Carole","EFNANE Wiam","ABDOU Mohammed","ZAOUALI Lillia","MAHEUX Aurore","JEANJEAN Xavier"]},
+  {id:4, name:"Marins",    icon:"⛵",    members:["TRISTCH Claire","BEN ABDENNEBI Faris","BOUROUBA Sarra","VIDAL Patrick","RENDU Carole"]},
+  {id:5, name:"Gardians",  icon:"🐎",    members:["DANGU Alicia","CHÉNIER Arnaud","ALLOUCHE Gabriella","WISPELAERE Victoria","NIETO Jean-Baptiste"]}
+];
+
+// Questions réécrites pour Aigues-Mortes uniquement
+const QUESTIONS = [
+  {
+    stopId:0,
+    text:"En quelle année Saint Louis a-t-il ordonné la construction de la Tour de Constance ?",
+    hint:"💡 C'est l'année de son départ pour la 7e croisade.",
+    answers:["1226","1248","1270","1302"],
+    correct:1,
+    expl:"La Tour de Constance fut érigée à partir de 1248, année où Saint Louis (Louis IX) embarqua depuis Aigues-Mortes pour la 7e croisade vers l'Égypte."
+  },
+  {
+    stopId:1,
+    text:"Que représentent les armoiries sculptées au-dessus de la Porte de la Gardette ?",
+    hint:"💡 Regardez en levant les yeux — c'est le blason d'un roi canonisé.",
+    answers:["Les armes de la ville d'Aigues-Mortes","Les armes du roi Louis IX","Les armes du pape Innocent IV","Les armes de la maison d'Anjou"],
+    correct:1,
+    expl:"Le tympan de la Porte de la Gardette porte les armes de Louis IX (fleurs de lys), rappelant que c'est lui qui fit bâtir la cité et ses remparts pour disposer d'un port royal en Méditerranée."
+  },
+  {
+    stopId:2,
+    text:"Pourquoi cette église s'appelle-t-elle 'Notre-Dame des Sablons' ?",
+    hint:"💡 Pensez à l'environnement naturel de la cité avant sa construction.",
+    answers:["À cause de la couleur dorée de sa pierre","Car elle était entourée de sable avant la construction de la cité","En l'honneur d'un saint nommé Sablon","Car ses vitraux représentent des dunes"],
+    correct:1,
+    expl:"Avant la fondation d'Aigues-Mortes, une chapelle dédiée à la Vierge s'élevait au milieu des sablons (dunes de sable) de la plaine deltaïque. L'église actuelle hérite de ce nom."
+  },
+  {
+    stopId:3,
+    text:"Quelle statue équestre orne le centre de cette place depuis 1859 ?",
+    hint:"💡 Il est roi ET saint — double titre rarissime dans l'histoire de France.",
+    answers:["Henri IV","Philippe le Bel","Louis IX (Saint Louis)","Louis XIV"],
+    correct:2,
+    expl:"La statue équestre de Saint Louis, inaugurée en 1859, trône au centre de la place. Saint Louis est le seul roi de France à avoir été canonisé (1297), d'où la double dévotion de la cité à son fondateur."
+  },
+  {
+    stopId:4,
+    text:"Combien de mètres de remparts entourent la cité médiévale d'Aigues-Mortes ?",
+    hint:"💡 Un chiffre précis — pensez à environ 1,5 km.",
+    answers:["980 mètres","1 640 mètres","2 100 mètres","3 200 mètres"],
+    correct:1,
+    expl:"Les remparts d'Aigues-Mortes forment un périmètre de 1 640 mètres, flanqué de 10 portes et 6 tours. Ils sont parmi les mieux conservés d'Europe pour un ensemble du XIIIe siècle."
+  },
+  {
+    stopId:5,
+    text:"Quelle ressource naturelle visible depuis cette porte a fait la richesse médiévale d'Aigues-Mortes ?",
+    hint:"💡 Blanc, précieux depuis l'Antiquité, encore récolté aujourd'hui en Camargue.",
+    answers:["Le marbre","Le soufre","Le sel","La tourbe"],
+    correct:2,
+    expl:"Le sel de Camargue, extrait des salins visibles depuis les remparts, constitua une ressource fiscale majeure dès le Moyen Âge. Le droit de gabelle sur le sel enrichit la couronne royale."
+  },
+  {
+    stopId:6,
+    text:"Quel événement dramatique s'est déroulé à Aigues-Mortes en août 1893 impliquant des travailleurs italiens ?",
+    hint:"💡 Un massacre lié à la récolte du sel et aux tensions entre ouvriers.",
+    answers:["Une mutinerie de galériens","Le massacre des Italiens lors de violences xénophobes","Un incendie des moulins à sel","Une épidémie de choléra"],
+    correct:1,
+    expl:"En août 1893, des ouvriers italiens travaillant aux salins furent attaqués par des saisonniers français lors de violences xénophobes. Le bilan officiel fut de 8 morts italiens, mais le chiffre réel serait bien supérieur."
+  },
+  {
+    stopId:7,
+    text:"Combien de tours jalonnent le chemin de ronde des remparts d'Aigues-Mortes ?",
+    hint:"💡 Un chiffre entre 5 et 10 — pensez aux points cardinaux et intermédiaires.",
+    answers:["4 tours","6 tours","9 tours","12 tours"],
+    correct:1,
+    expl:"Six tours ponctuent le chemin de ronde : la Tour de Constance (la plus massive), la Tour de Villeneuve, la Tour des Bourguignons, la Tour du Sel, la Tour de la Poudrière et la Tour d'Anglas."
+  }
+];
+
+// ═══ STATE ════════════════════════════════════════════
+const scores = JSON.parse(localStorage.getItem('aiguesmortes_v2') || '{}');
+let S = { teamId:null, route:[], pos:0, score:0, answered:false, timer:null, timeLeft:60, done:[], _stopsData:{} };
+
+
+// ═══ EVENT TRACKING (lu par le dashboard admin) ═══════
+const EVENTS_KEY = 'aiguesmortes_events';
+const PROGRESS_KEY = 'aiguesmortes_progress';
+
+function trackEvent(evt) {
+  try {
+    const events = JSON.parse(localStorage.getItem(EVENTS_KEY) || '[]');
+    events.push({ ...evt, ts: Date.now() });
+    // Garder max 500 événements
+    if (events.length > 500) events.splice(0, events.length - 500);
+    localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+  } catch(e) {}
+}
+
+function updateProgress() {
+  try {
+    const progress = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+    progress[S.teamId] = {
+      score: S.score,
+      currentPos: S.pos,
+      stopsCompleted: S.done.length,
+      stopsData: S._stopsData || {},
+      updatedAt: Date.now()
+    };
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+  } catch(e) {}
+}
+
+// ═══ INIT ══════════════════════════════════════════════
+function init() {
+  // Google Maps lien global (tous les stops)
+  const allCoords = STOPS.map(s=>`${s.lat},${s.lng}`).join('/');
+  document.getElementById('gmaps-all').href = `https://www.google.com/maps/dir/${allCoords}`;
+
+  // Team grid
+  const grid = document.getElementById('team-grid');
+  TEAMS.forEach(t => {
+    const startStop = STOPS[TEAM_ROUTES[t.id][0]];
+    const b = document.createElement('button');
+    b.className = 'team-btn'; b.id = 'tb-'+t.id;
+    const chips = t.members.map(m => {
+      const parts = m.split(' ');
+      const prenom = parts[parts.length-1];
+      const nom = parts.slice(0,-1).join(' ');
+      return `<span class="member-chip">${prenom} ${nom.split(' ')[0]}</span>`;
+    }).join('');
+    b.innerHTML = `<span class="team-icon">${t.icon}</span><span class="team-name">${t.name}</span><div class="team-members-list">${chips}</div><span class="team-start">${startStop.icon} Départ : ${startStop.name}</span>`;
+    b.onclick = () => selectTeam(t.id);
+    grid.appendChild(b);
+  });
+
+  // QR code via API QR rapide (qrserver.com)
+  const qrUrl = encodeURIComponent(window.location.href);
+  document.getElementById('qr-img-wrap').innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrUrl}&color=003366" width="200" height="200" style="border-radius:10px;border:3px solid #003366;" alt="QR Code">`;
+  document.getElementById('qr-url-display').textContent = window.location.hostname || 'letsgrau.exco.fr';
+}
+
+function selectTeam(id) {
+  S.teamId = id;
+  document.querySelectorAll('.team-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('tb-'+id).classList.add('selected');
+  document.getElementById('btn-start').disabled = false;
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function openMap() { renderMapPanel(); document.getElementById('map-overlay').classList.add('open'); }
+function closeMap() { document.getElementById('map-overlay').classList.remove('open'); }
+function openQR()  { document.getElementById('qr-modal').classList.add('open'); }
+
+// ═══ MAP PANEL ════════════════════════════════════════
+function renderMapPanel() {
+  const list = document.getElementById('map-stop-list');
+  list.innerHTML = '';
+
+  const route = S.teamId ? S.route : STOPS.map((_,i)=>i);
+
+  route.forEach((stopId, i) => {
+    const s = STOPS[stopId];
+    const done = S.done.includes(stopId);
+    const isCurrent = S.teamId && i === S.pos && !done;
+
+    const div = document.createElement('div');
+    div.className = 'stop-item' + (done?' done':'');
+
+    // Distance from current stop (if we have geolocation)
+    let distHtml = '';
+    if (isCurrent) distHtml = '<span class="stop-dist">📍 Vous êtes ici</span>';
+
+    div.innerHTML = `
+      <div class="stop-num">${done?'✓':(i+1)}</div>
+      <div class="stop-text">
+        <div class="stop-name">${s.icon} ${s.name}</div>
+        <div class="stop-desc">${s.desc}</div>
+      </div>
+      ${distHtml}
+      <a href="${s.gmaps}" target="_blank" rel="noopener" style="font-size:18px;text-decoration:none;" onclick="event.stopPropagation()">🧭</a>`;
+    list.appendChild(div);
+  });
+}
+
+// ═══ GAME FLOW ════════════════════════════════════════
+function startGame() {
+  const team = TEAMS.find(t=>t.id===S.teamId);
+  S.route = TEAM_ROUTES[S.teamId];
+  S.pos = 0; S.score = 0; S.done = []; S._stopsData = {};
+  trackEvent({type:'start', teamId:S.teamId});
+  updateProgress();
+
+  document.getElementById('route-title').textContent = `${team.icon} ${team.name} — Votre parcours`;
+  const steps = document.getElementById('route-steps');
+  steps.innerHTML = '';
+  S.route.forEach((sid, i) => {
+    const s = STOPS[sid];
+    const d = document.createElement('div'); d.className = 'route-step';
+    d.innerHTML = `<div class="rdot ${i===0?'s':'r'}">${i+1}</div>
+      <div>
+        <div class="rstep-label">${i===0?'⭐ Départ':i===S.route.length-1?'🏁 Dernier arrêt':'Arrêt '+(i+1)}</div>
+        <div class="rstep-loc">${s.icon} ${s.name}</div>
+        <div class="rstep-hint">${s.desc}</div>
+      </div>`;
+    steps.appendChild(d);
+  });
+  showScreen('screen-route');
+}
+
+function goWaypoint() { showWaypoint(); }
+
+function showWaypoint() {
+  const sid = S.route[S.pos];
+  const s = STOPS[sid];
+  document.getElementById('wp-icon').textContent = s.icon;
+  document.getElementById('wp-num').textContent = `Arrêt ${S.pos+1} / ${S.route.length}`;
+  document.getElementById('wp-place').textContent = s.name;
+  document.getElementById('wp-desc').textContent = s.desc;
+  document.getElementById('wp-pts').textContent = `⭐ Score actuel : ${S.score} pts`;
+  // Lien de navigation GPS directe
+  document.getElementById('wp-nav').href = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=walking`;
+  showScreen('screen-waypoint');
+}
+
+function startQuestion() {
+  const sid = S.route[S.pos];
+  const q = QUESTIONS.find(q=>q.stopId===sid);
+  const team = TEAMS.find(t=>t.id===S.teamId);
+  clearInterval(S.timer);
+
+  document.getElementById('q-prog').innerHTML = S.route.map((_,i)=>`<div class="q-dot ${i<S.pos?'done':i===S.pos?'cur':''}"></div>`).join('');
+  document.getElementById('q-pill').textContent = team.icon+' '+team.name;
+  document.getElementById('q-loc').textContent = STOPS[sid].name;
+  document.getElementById('q-text').textContent = q.text;
+  document.getElementById('q-hint').textContent = q.hint;
+  document.getElementById('score-live').textContent = S.score;
+  document.getElementById('expl').style.display = 'none';
+  document.getElementById('btn-next').style.display = 'none';
+
+  document.getElementById('answers').innerHTML = q.answers.map((a,i)=>`
+    <button class="ans-btn" id="a${i}" onclick="pick(${i})">
+      <span class="ans-ltr">${String.fromCharCode(65+i)}</span>${a}
+    </button>`).join('');
+
+  S.answered = false; S.timeLeft = 60;
+  updTimer();
+  S.timer = setInterval(()=>{ S.timeLeft--; updTimer(); if(S.timeLeft<=0){clearInterval(S.timer);if(!S.answered)timeUp();} },1000);
+  showScreen('screen-question');
+}
+
+function updTimer() {
+  const circ=213.6, pct=S.timeLeft/60;
+  const arc=document.getElementById('t-arc');
+  arc.style.strokeDashoffset = circ*(1-pct);
+  arc.style.stroke = S.timeLeft<=10?'#EF4444':S.timeLeft<=20?'#F59E0B':'#00A850';
+  document.getElementById('t-num').textContent = S.timeLeft;
+}
+
+function pick(idx) {
+  if(S.answered) return;
+  S.answered = true; clearInterval(S.timer);
+  const sid = S.route[S.pos];
+  const q = QUESTIONS.find(q=>q.stopId===sid);
+  const pts = Math.max(10, Math.round((S.timeLeft/60)*100));
+
+  document.querySelectorAll('.ans-btn').forEach((b,i)=>{
+    b.disabled=true;
+    if(i===q.correct) b.classList.add('correct');
+    else if(i===idx) b.classList.add('wrong');
+  });
+  if(idx===q.correct){ S.score+=pts; document.getElementById('score-live').textContent=S.score; }
+  S._stopsData[sid] = idx===q.correct ? 'correct' : 'wrong';
+  trackEvent({type:'answer', teamId:S.teamId, stopId:sid, correct:idx===q.correct, pts:idx===q.correct?pts:0});
+  updateProgress();
+  showExpl(q.expl); S.done.push(sid); showNextBtn();
+}
+
+function timeUp() {
+  S.answered=true;
+  const q=QUESTIONS.find(q=>q.stopId===S.route[S.pos]);
+  const _sid=S.route[S.pos];
+  document.querySelectorAll('.ans-btn').forEach((b,i)=>{ b.disabled=true; if(i===q.correct)b.classList.add('reveal'); });
+  S._stopsData[_sid] = 'timeout';
+  trackEvent({type:'timeout', teamId:S.teamId, stopId:_sid, correct:false, pts:0});
+  updateProgress();
+  showExpl('⏱ Temps écoulé ! '+q.expl);
+  S.done.push(_sid); showNextBtn();
+}
+
+function showExpl(txt) {
+  const e=document.getElementById('expl'); e.textContent='📖 '+txt; e.style.display='block';
+}
+function showNextBtn() {
+  const b=document.getElementById('btn-next'); b.style.display='block';
+  b.textContent = S.pos+1<S.route.length ? 'Prochain arrêt →' : '🏆 Voir mon score';
+}
+
+function nextStop() {
+  S.pos++;
+  if(S.pos>=S.route.length) finish();
+  else showWaypoint();
+}
+
+// ═══ FINISH ══════════════════════════════════════════
+function finish() {
+  clearInterval(S.timer);
+  const team=TEAMS.find(t=>t.id===S.teamId);
+  trackEvent({type:'finish', teamId:S.teamId, score:S.score});
+  scores[S.teamId]={name:team.name,icon:team.icon,score:S.score,stopsData:S._stopsData};
+  localStorage.setItem('aiguesmortes_v2',JSON.stringify(scores));
+
+  document.getElementById('f-team').textContent=team.icon+' Équipe '+team.name;
+  document.getElementById('f-pts').textContent=S.score;
+  const max=QUESTIONS.length*100, pct=Math.round(S.score/max*100);
+  document.getElementById('f-trophy').textContent=pct>=80?'🥇':pct>=60?'🥈':pct>=40?'🥉':'🎖️';
+  document.getElementById('f-msg').textContent=
+    pct>=80?'Exceptionnel ! Vous êtes de vrais experts de la cité médiévale !':
+    pct>=60?'Très bien ! Quelques secrets vous échappent encore.':
+    pct>=40?'Pas mal ! La cité a encore des surprises pour vous.':
+    'À refaire ! Aigues-Mortes n\'a pas livré tous ses mystères.';
+
+  const sorted=Object.values(scores).sort((a,b)=>b.score-a.score);
+  const medals=['🥇','🥈','🥉'];
+  const maxS=sorted[0]?.score||1;
+  const rows=document.getElementById('rank-rows'); rows.innerHTML='';
+  const played=new Set(Object.keys(scores).map(Number));
+  sorted.forEach((e,i)=>{
+    const d=document.createElement('div'); d.className='rank-row';
+    d.innerHTML=`<div class="rank-n">${medals[i]||'#'+(i+1)}</div>
+      <div class="rank-t"><div class="rank-name">${e.icon} Équipe ${e.name}</div>
+      <div class="rank-bar-w"><div class="rank-bar" style="width:${Math.round(e.score/maxS*100)}%"></div></div></div>
+      <div class="rank-pts">${e.score} pts</div>`;
+    rows.appendChild(d);
+  });
+  TEAMS.filter(t=>!played.has(t.id)).forEach(t=>{
+    const d=document.createElement('div'); d.className='rank-row pending';
+    d.innerHTML=`<div class="rank-n">—</div><div class="rank-t"><div class="rank-name">${t.icon} Équipe ${t.name}</div></div><div class="rank-pts">En jeu…</div>`;
+    rows.appendChild(d);
+  });
+
+  showScreen('screen-final');
+}
+
+function resetAll() {
+  clearInterval(S.timer);
+  S={teamId:null,route:[],pos:0,score:0,answered:false,timer:null,timeLeft:60,done:[],_stopsData:{}};
+  document.querySelectorAll('.team-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('btn-start').disabled=true;
+  showScreen('screen-welcome');
+}
+
+init();
+</script>
+</body>
+</html>
